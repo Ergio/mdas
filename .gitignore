@@ -43,6 +43,7 @@ venv.bak/
 .ipynb_checkpoints
 test.ipynb
 test1.ipynb
+todo.md
 
 # Data files
 data/sample_pdfs/*.pdf

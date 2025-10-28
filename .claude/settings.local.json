@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(\"c:\\Users\\serhi\\OneDrive\\Робочий стіл\\mdas\\venv\\Scripts\\pip.exe\" list)"
     ],
     "deny": [],
     "ask": []
