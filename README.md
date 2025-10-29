@@ -46,7 +46,10 @@ Results saved to `results/evaluation_results_YYYYMMDD_HHMMSS.json`
 - **Relevancy**: Answer relevance to query
 
 
-An AI-powered system for analyzing and querying multiple PDF documents using RAG (Retrieval Augmented Generation) and LangChain agents.
+#### Use LangSmith to trace every step of your LLM workflow
+
+<img width="1908" height="818" alt="Image" src="https://github.com/user-attachments/assets/64acdc45-1152-4449-a487-f130d1364231" />
+
 
 ## Architecture Overview
 
