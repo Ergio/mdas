@@ -205,6 +205,7 @@ def evaluate_agent(agent, test_cases: List[Dict[str, str]] = None, model_name: s
             "query": row["question"],
             "expected": row["ground_truth"],
             "actual": row["answer"],
+            "latency_seconds": row["latency_seconds"],
             "scores": {
                 "correctness": round(correctness, 3),
                 "faithfulness": round(faithfulness_score, 3),
@@ -215,6 +216,9 @@ def evaluate_agent(agent, test_cases: List[Dict[str, str]] = None, model_name: s
 
         test_cases_results.append(test_case)
 
+    # Calculate average latency
+    avg_latency = sum(item["latency_seconds"] for item in agent_data) / len(agent_data)
+
     # Build final results
     results = {
         "model": model_name,
@@ -224,7 +228,8 @@ def evaluate_agent(agent, test_cases: List[Dict[str, str]] = None, model_name: s
             "correctness": round(results_df['answer_correctness'].mean(), 3),
             "faithfulness": round(results_df['faithfulness'].mean(), 3),
             "precision": round(results_df['context_precision'].mean(), 3),
-            "relevancy": round(results_df['answer_relevancy'].mean(), 3)
+            "relevancy": round(results_df['answer_relevancy'].mean(), 3),
+            "avg_latency_seconds": round(avg_latency, 2)
         },
 
         "test_cases": test_cases_results
@@ -238,6 +243,7 @@ def evaluate_agent(agent, test_cases: List[Dict[str, str]] = None, model_name: s
     print(f"Faithfulness: {results['metrics']['faithfulness']:.3f}")
     print(f"Precision:    {results['metrics']['precision']:.3f}")
     print(f"Relevancy:    {results['metrics']['relevancy']:.3f}")
+    print(f"Avg Latency:  {results['metrics']['avg_latency_seconds']:.2f}s")
     print("="*60)
 
     return results
