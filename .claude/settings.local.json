@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(\"c:\\Users\\serhi\\OneDrive\\Робочий стіл\\mdas\\venv\\Scripts\\pip.exe\" list)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}

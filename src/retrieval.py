@@ -4,6 +4,8 @@ from typing import List
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
+from src.utils import filter_by_document
+from config import EMBEDDING_MODEL, FILTERED_TOP_K
 
 
 class VectorStoreRetriever:
@@ -11,13 +13,14 @@ class VectorStoreRetriever:
     Vector store retriever for semantic search over document chunks.
     """
 
-    def __init__(self, embedding_model: str = "text-embedding-3-large"):
+    def __init__(self, embedding_model: str = None):
         """
         Initialize the vector store retriever.
 
         Args:
-            embedding_model: Name of the OpenAI embedding model to use
+            embedding_model: Name of the OpenAI embedding model to use (defaults to config)
         """
+        embedding_model = embedding_model or EMBEDDING_MODEL
         self.embeddings = OpenAIEmbeddings(model=embedding_model)
         self.vector_store = InMemoryVectorStore(self.embeddings)
 
@@ -33,35 +36,6 @@ class VectorStoreRetriever:
         """
         document_ids = self.vector_store.add_documents(documents=documents)
         return document_ids
-
-    def search(
-        self,
-        query: str,
-        k: int = 10,
-        document_name: str = None
-    ) -> List[Document]:
-        """
-        Search for relevant documents using similarity search.
-
-        Args:
-            query: The search query
-            k: Number of documents to retrieve
-            document_name: Optional document name to filter results
-
-        Returns:
-            List of relevant Document objects
-        """
-        retrieved_docs = self.vector_store.similarity_search(query, k=k)
-
-        # Filter by document name if provided
-        if document_name:
-            retrieved_docs = [
-                doc for doc in retrieved_docs
-                if document_name.lower() in doc.metadata.get('source', '').lower()
-            ]
-            retrieved_docs = retrieved_docs[:5]
-
-        return retrieved_docs
 
     def mmr_search(
         self,
@@ -91,16 +65,12 @@ class VectorStoreRetriever:
                 fetch_k=fetch_k,
                 lambda_mult=lambda_mult
             )
-        except Exception:
+        except (AttributeError, NotImplementedError):
             # Fallback to similarity search if MMR not supported
             retrieved_docs = self.vector_store.similarity_search(query, k=k)
 
         # Filter by document name if provided
         if document_name:
-            retrieved_docs = [
-                doc for doc in retrieved_docs
-                if document_name.lower() in doc.metadata.get('source', '').lower()
-            ]
-            retrieved_docs = retrieved_docs[:5]
+            retrieved_docs = filter_by_document(retrieved_docs, document_name, FILTERED_TOP_K)
 
         return retrieved_docs

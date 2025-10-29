@@ -7,7 +7,12 @@ from langchain_openai import ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.retrieval import VectorStoreRetriever
 from src.document_processor import load_pdfs
-import os
+from src.utils import filter_by_document, serialize_documents
+from config import (
+    get_api_key, LLM_MODEL_MINI, DATA_DIR,
+    DEFAULT_K, FILTERED_K, MMR_FETCH_K, MMR_LAMBDA, FILTERED_TOP_K,
+    SUMMARY_CHUNK_SIZE, SUMMARY_CHUNK_OVERLAP
+)
 
 
 # Global retriever instance (will be initialized by agent)
@@ -46,24 +51,19 @@ def retrieve_context(query: str, document_name: str = None) -> Tuple[str, List[D
         raise RuntimeError("Retriever not initialized. Call set_retriever() first.")
 
     # Increase k significantly to get better coverage
-    k = 20 if document_name else 10
+    k = FILTERED_K if document_name else DEFAULT_K
 
     # Use MMR (Maximal Marginal Relevance) for diversity
     retrieved_docs = _retriever.mmr_search(
         query=query,
         k=k,
-        fetch_k=50,
-        lambda_mult=0.5,
+        fetch_k=MMR_FETCH_K,
+        lambda_mult=MMR_LAMBDA,
         document_name=document_name
     )
 
-    # Enhanced serialization with metadata
-    serialized = "\n\n".join(
-        (f"[Document: {doc.metadata.get('source', 'unknown').split('\\\\')[-1]} | "
-         f"Page: {doc.metadata.get('page', '?')}]\n"
-         f"{doc.page_content}")
-        for doc in retrieved_docs
-    )
+    # Serialize documents with metadata
+    serialized = serialize_documents(retrieved_docs)
 
     return serialized, retrieved_docs
 
@@ -85,13 +85,12 @@ def summarize_document(document_name: str, notes: str = "") -> str:
     """
 
     llm = ChatOpenAI(
-        model="gpt-5-mini-2025-08-07",
+        model=LLM_MODEL_MINI,
         temperature=0,
-        api_key=os.getenv("OPENAI_API_KEY")
+        api_key=get_api_key()
     )
 
-
-    pdf_directory = "./data/sample_pdfs/"
+    pdf_directory = str(DATA_DIR)
     all_docs = load_pdfs(pdf_directory)
 
     target_docs = [doc for doc in all_docs if document_name in doc.metadata.get('source', '')]
@@ -102,8 +101,8 @@ def summarize_document(document_name: str, notes: str = "") -> str:
     full_text = "\n\n".join([doc.page_content for doc in target_docs])
 
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=12000,  # ~3000 tokens
-        chunk_overlap=500,
+        chunk_size=SUMMARY_CHUNK_SIZE,
+        chunk_overlap=SUMMARY_CHUNK_OVERLAP,
         separators=["\n\n\n", "\n\n", "\n", " ", ""]
     )
     chunks = text_splitter.split_text(full_text)

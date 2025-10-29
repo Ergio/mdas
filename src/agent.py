@@ -1,12 +1,13 @@
 """Main agent implementation module."""
 
-import os
 from typing import Dict, Any
 from langchain.chat_models import init_chat_model
 from langchain.agents import create_agent
+from langgraph.errors import GraphRecursionError
 from src.document_processor import process_documents
 from src.retrieval import VectorStoreRetriever
 from src.tools import get_available_tools, set_retriever
+from config import LLM_MODEL, DATA_DIR
 
 
 # Core system prompt (domain-agnostic)
@@ -87,16 +88,19 @@ class MultiDocumentAgent:
 
     def __init__(
         self,
-        model_name: str = "openai:gpt-5-2025-08-07",
-        pdf_directory: str = "./data/sample_pdfs/"
+        model_name: str = None,
+        pdf_directory: str = None
     ):
         """
         Initialize the agent.
 
         Args:
-            model_name: Name of the LLM model to use
-            pdf_directory: Path to directory containing PDF files
+            model_name: Name of the LLM model to use (defaults to config)
+            pdf_directory: Path to directory containing PDF files (defaults to config)
         """
+        model_name = model_name or LLM_MODEL
+        pdf_directory = pdf_directory or str(DATA_DIR)
+
         self.model = init_chat_model(model_name)
         self.documents = process_documents(pdf_directory)
         self.retriever = VectorStoreRetriever()
@@ -121,17 +125,40 @@ class MultiDocumentAgent:
         Returns:
             Dictionary containing the agent's response
         """
-        if stream:
+        config = {"recursion_limit": 50}
 
-            for event in self.agent.stream(
-                {"messages": [{"role": "user", "content": question}]},
-                stream_mode="values",
-            ):
-                event["messages"][-1].pretty_print()
+        try:
+            if stream:
 
-            return event
-        else:
-            response = self.agent.invoke(
-                {"messages": [{"role": "user", "content": question}]}
+                for event in self.agent.stream(
+                    {"messages": [{"role": "user", "content": question}]},
+                    stream_mode="values",
+                    config=config,
+                ):
+                    event["messages"][-1].pretty_print()
+
+                return event
+            else:
+                response = self.agent.invoke(
+                    {"messages": [{"role": "user", "content": question}]},
+                    config=config,
+                )
+                return response
+        except GraphRecursionError as e:
+            error_message = (
+                "The agent encountered too many processing steps while answering your question. "
+                "This usually happens when the query is too complex or the agent gets stuck in a loop. "
+                "Please try:\n"
+                "- Simplifying your question\n"
+                "- Breaking it into smaller, more specific questions\n"
+                "- Being more explicit about which documents to search"
             )
-            return response
+
+            # Return error in the same format as normal responses
+            return {
+                "messages": [{
+                    "type": "ai",
+                    "content": error_message
+                }],
+                "error": str(e)
+            }

@@ -12,6 +12,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 
 from src.agent import MultiDocumentAgent
+from config import get_api_key
 
 
 def main():
@@ -28,8 +29,10 @@ def main():
     st.title("Multi-Document Analysis System")
 
     # Verify API key is set
-    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
-        st.error("OPENAI_API_KEY not set properly!")
+    try:
+        get_api_key()
+    except ValueError as e:
+        st.error(f"Configuration error: {str(e)}")
         st.stop()
 
     # Initialize agent (cached to avoid reprocessing on every interaction)
@@ -38,8 +41,14 @@ def main():
         """Initialize the agent with caching."""
         try:
             return MultiDocumentAgent()
+        except FileNotFoundError as e:
+            st.error(f"Document loading error: {str(e)}")
+            st.stop()
+        except ValueError as e:
+            st.error(f"Configuration error: {str(e)}")
+            st.stop()
         except Exception as e:
-            st.error(f"Failed to initialize: {str(e)}")
+            st.error(f"Initialization failed: {str(e)}")
             st.stop()
 
     agent = initialize_agent()
@@ -76,6 +85,20 @@ def main():
         # Process with agent
         try:
             result = agent.query(prompt, stream=False)
+        except ValueError as e:
+            error_msg = f"Query error: {str(e)}"
+            with st.chat_message("assistant"):
+                st.error(error_msg)
+            st.session_state.messages.append({"type": "assistant", "content": error_msg})
+            return
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            with st.chat_message("assistant"):
+                st.error(error_msg)
+            st.session_state.messages.append({"type": "assistant", "content": error_msg})
+            return
+
+        try:
 
             # Parse all messages in order
             for msg in result["messages"]:
@@ -118,8 +141,13 @@ def main():
                 st.markdown(final_response)
             st.session_state.messages.append({"type": "assistant", "content": final_response})
 
+        except (KeyError, IndexError) as e:
+            error_msg = f"Response parsing error: {str(e)}"
+            with st.chat_message("assistant"):
+                st.error(error_msg)
+            st.session_state.messages.append({"type": "assistant", "content": error_msg})
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
+            error_msg = f"Processing error: {str(e)}"
             with st.chat_message("assistant"):
                 st.error(error_msg)
             st.session_state.messages.append({"type": "assistant", "content": error_msg})
