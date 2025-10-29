@@ -1,0 +1,133 @@
+{
+  "model": "gpt-4.1",
+  "date": "2025-10-29T05:06:20.859733Z",
+  "metrics": {
+    "correctness": 0.893,
+    "faithfulness": 0.8,
+    "precision": 0.771,
+    "relevancy": 0.866,
+    "avg_latency_seconds": 26.16
+  },
+  "test_cases": [
+    {
+      "query": "Compare revenue growth Q3 FY2025: Accenture.pdf vs Siemens.pdf. Which higher?",
+      "expected": "Accenture: +8% USD [Accenture.pdf, p.1], Siemens: +3% actual [Siemens.pdf, p.7]. Accenture higher.",
+      "actual": "Accenture: +8% USD (+7% local currency) [Accenture.pdf, p.1]. Siemens: +3% actual (+5% comparable) [Siemens.pdf, p.7]. Accenture higher.",
+      "latency_seconds": 19.22,
+      "scores": {
+        "correctness": 0.809,
+        "faithfulness": 1.0,
+        "precision": 0.0,
+        "relevancy": 0.899
+      }
+    },
+    {
+      "query": "Operating margins Q3 FY2025 for Accenture.pdf, Siemens.pdf, Infineon.pdf?",
+      "expected": "Infineon: 18.0% [Infineon.pdf, p.1], Accenture: 16.8% [Accenture.pdf, p.2], Siemens: 14.9% [Siemens.pdf, p.7]",
+      "actual": "- Accenture: 16.8% [Accenture.pdf, p.2]\n- Siemens (Industrial Business profit margin): 14.9% [Siemens.pdf, p.7]\n- Infineon (Segment Result Margin): 18.0% [Infineon.pdf, p.7]",
+      "latency_seconds": 46.0,
+      "scores": {
+        "correctness": 0.985,
+        "faithfulness": 1.0,
+        "precision": 1.0,
+        "relevancy": 0.933
+      }
+    },
+    {
+      "query": "Timeline of Q3 FY2025 earnings releases?",
+      "expected": "Accenture: June 20, 2025 [Accenture.pdf, p.1], Infineon: August 5, 2025 [Infineon.pdf, p.1], Siemens: August 7, 2025 [Siemens.pdf, p.1]",
+      "actual": "- Accenture: June 20, 2025 [Accenture.pdf, p.0]\n- Infineon: August 05, 2025 [Infineon.pdf, p.0]\n- Siemens: August 07, 2025 [Siemens.pdf, p.0]",
+      "latency_seconds": 34.65,
+      "scores": {
+        "correctness": 0.997,
+        "faithfulness": 0.667,
+        "precision": 1.0,
+        "relevancy": 0.82
+      }
+    },
+    {
+      "query": "What was Siemens.pdf Industrial Business revenue in Q3 FY2025?",
+      "expected": "€18.5B, +3% actual growth [Siemens.pdf, p.7]",
+      "actual": "€18,866 million [Siemens.pdf, p.11]",
+      "latency_seconds": 54.69,
+      "scores": {
+        "correctness": 0.609,
+        "faithfulness": 0.0,
+        "precision": 0.71,
+        "relevancy": 0.883
+      }
+    },
+    {
+      "query": "Compare Q3 FY2025 free cash flow across all docs.",
+      "expected": "Accenture: $3.52B [Accenture.pdf, p.3], Siemens: €2.9B [Siemens.pdf, p.7], Infineon: €288M [Infineon.pdf, p.12]. Accenture highest, Siemens second, Infineon lowest.",
+      "actual": "Accenture: $3.52B [Accenture.pdf, p.3]\nSiemens: €2.918B (continuing and discontinued ops) [Siemens.pdf, p.7]\nInfineon: €288M [Infineon.pdf, p.12]\n\nConclusion: Accenture highest; Siemens next; Infineon lowest.",
+      "latency_seconds": 24.16,
+      "scores": {
+        "correctness": 0.846,
+        "faithfulness": 0.333,
+        "precision": 1.0,
+        "relevancy": 0.754
+      }
+    },
+    {
+      "query": "Segment Result Margin for Infineon.pdf Q3 FY2025?",
+      "expected": "18.0% [Infineon.pdf, p.1]",
+      "actual": "18.0% [Infineon.pdf, p.1]",
+      "latency_seconds": 16.76,
+      "scores": {
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "precision": 1.0,
+        "relevancy": 0.871
+      }
+    },
+    {
+      "query": "Employees end of Q3 FY2025: Siemens.pdf vs Infineon.pdf?",
+      "expected": "Siemens: 315,000 [Siemens.pdf, p.6], Infineon: 56,371 [Infineon.pdf, p.9]",
+      "actual": "Siemens: 315k (June 30, 2025) [Siemens.pdf, p.7], Infineon: 56,371 (June 30, 2025) [Infineon.pdf, p.9]. Siemens higher.",
+      "latency_seconds": 35.12,
+      "scores": {
+        "correctness": 0.688,
+        "faithfulness": 1.0,
+        "precision": 0.0,
+        "relevancy": 0.896
+      }
+    },
+    {
+      "query": "Accenture.pdf revenue change Q3 FY2025 vs Q3 FY2024?",
+      "expected": "+8% USD, +7% local currency [Accenture.pdf, p.1]",
+      "actual": "+8% USD, +7% local currency [Accenture.pdf, p.1]",
+      "latency_seconds": 12.16,
+      "scores": {
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "precision": 1.0,
+        "relevancy": 0.85
+      }
+    },
+    {
+      "query": "Siemens.pdf net income Q3 FY2025?",
+      "expected": "€2.243B [Siemens.pdf, p.8]",
+      "actual": "€2.243B [Siemens.pdf, p.8]",
+      "latency_seconds": 9.93,
+      "scores": {
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "precision": 1.0,
+        "relevancy": 0.874
+      }
+    },
+    {
+      "query": "Infineon.pdf adjusted gross margin Q3 FY2025?",
+      "expected": "43.0% [Infineon.pdf, p.1]",
+      "actual": "43.0% [Infineon.pdf, p.1]",
+      "latency_seconds": 8.86,
+      "scores": {
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "precision": 1.0,
+        "relevancy": 0.877
+      }
+    }
+  ]
+}
