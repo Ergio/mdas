@@ -1,4 +1,5 @@
 # Multi-Document Analysis System
+An AI-powered system for analyzing and querying multiple PDF documents using RAG (Retrieval Augmented Generation) and LangChain agents.
 
 ## Setup
 
@@ -38,7 +39,7 @@ Results saved to `results/evaluation_results_YYYYMMDD_HHMMSS.json`
 - **Relevancy**: Answer relevance to query
 
 
-An AI-powered system for analyzing and querying multiple PDF documents using RAG (Retrieval Augmented Generation) and LangChain agents.
+
 
 ## Architecture Overview
 

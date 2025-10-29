@@ -73,8 +73,9 @@ def build_system_prompt(documents: list = None) -> str:
     prompt = f"{BASE_SYSTEM_PROMPT}\n{DOMAIN_INSTRUCTIONS}"
 
     if documents:
-        # Extract unique document names
-        doc_names = sorted(set(doc.metadata.get('source', 'Unknown') for doc in documents))
+        # Extract unique document names (filenames only, not full paths)
+        import os
+        doc_names = sorted(set(os.path.basename(doc.metadata.get('source', 'Unknown')) for doc in documents))
         doc_list = "\n".join(f"- {name}" for name in doc_names)
         prompt += f"\nAvailable Documents:\n{doc_list}"
 
