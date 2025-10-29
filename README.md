@@ -1,5 +1,6 @@
 # Multi-Document Analysis System
-
+An AI-powered system for analyzing and querying multiple PDF documents using RAG (Retrieval Augmented Generation) and LangChain agents.
+<img width="960" height="510" alt="Image" src="https://github.com/user-attachments/assets/db8c9446-2505-436e-90a2-4ae1b23b7bdf" />
 ## Setup
 
 ```bash
