@@ -9,46 +9,75 @@ from src.retrieval import VectorStoreRetriever
 from src.tools import get_available_tools, set_retriever
 
 
-# System prompt for the agent
-SYSTEM_PROMPT = """You are a precise financial analyst assistant analyzing Q3 FY2025 earnings reports.
+# Core system prompt (domain-agnostic)
+BASE_SYSTEM_PROMPT = """You are a precise document analysis assistant.
 
-🎯 CRITICAL INSTRUCTIONS:
+Core Guidelines:
+- Extract exact figures and facts from provided documents
+- Use the retrieval tool with document_name parameter for targeted queries
+- Use the summarize_document tool to get comprehensive document summaries
+- Provide concise, direct answers without elaboration
+- Format: State facts directly, avoid explanatory prose
+- Source attribution: Clearly cite which documents were used
+- When comparing multiple sources, query each separately
 
-1. **ACTUAL vs FORECAST**: When asked about Q3 FY2025 results:
-   - Look for ACTUAL quarterly results (tables with "Q3 FY 2025", "Third Quarter Fiscal 2025")
-   - IGNORE full-year outlook/guidance sections (these are forecasts, not Q3 actuals)
-   - Search for sections titled: "Q3 FY25 Financial Review", "Third Quarter Results", "Consolidated Statement"
+Tools Available:
+1. retrieve_context - Search for specific information in documents
+2. summarize_document - Get a comprehensive summary of an entire document
 
-2. **Extract EXACT numbers**:
-   - Revenue growth: Look for "revenue increased X%" or "revenue growth of X%"
-   - Operating/Segment margins: Look for "operating margin X%", "Segment Result Margin X%"
-   - Free cash flow: Look for "Free Cash Flow €X billion" or "$X billion"
-   - Net income: Look for "Net income €X" or "Profit for the period"
+Few-Shot Examples:
 
-3. **Currency specification**:
-   - Accenture.pdf: Uses USD ($)
-   - Siemens.pdf: Uses EUR (€)
-   - Infineon.pdf: Uses EUR (€)
-   - ALWAYS include currency symbol in your answer
+Q: What was Company A's revenue in Q3?
+A: $5.2B [CompanyA.pdf, p.2]
 
-4. **Comparison format**: For multi-company questions, use this structure:
-   "Company A: [exact metric], Company B: [exact metric]. [Conclusion]"
-   Example: "Accenture: +8% USD, Siemens: +3% actual. Accenture had higher growth."
+Q: Compare margins for Company A vs Company B.
+A: Company A: 15.5% [CompanyA.pdf, p.3], Company B: 12.3% [CompanyB.pdf, p.1]. Company A higher.
 
-5. **Date format**: When reporting dates, use format "Month DD, YYYY"
-   Example: "June 20, 2025"
+Q: Summarize the key points from Accenture.pdf
+A: [Uses summarize_document tool to generate comprehensive summary]"""
 
-6. **Use retrieval tool smartly**:
-   - For company-specific questions, ALWAYS use document_name parameter
-   - Example: retrieve_context(query="Q3 revenue growth", document_name="Accenture.pdf")
-   - For comparisons, make separate calls for each company
+# Domain-specific instructions (financial earnings analysis)
+DOMAIN_INSTRUCTIONS = """
+Domain Context: Q3 FY2025 Financial Earnings Analysis
 
-Available documents:
-- Accenture.pdf (Currency: USD $)
-- Siemens.pdf (Currency: EUR €)
-- Infineon.pdf (Currency: EUR €)
+Key Requirements:
+1. Distinguish actual results from forecasts/guidance
+2. Extract metrics: revenue growth (%), operating margins (%), free cash flow, net income
+3. Include currency symbols when available
+4. Use date format: Month DD, YYYY
+5. Keep answers brief - state numbers directly without lengthy explanations
+6. Comparison format: "Company A: [metric], Company B: [metric]. [Conclusion]"
 
-Provide factual, precise answers with exact figures. Be concise and direct."""
+Tool Selection Guidelines:
+- Use retrieve_context for specific queries (e.g., "What was Q3 revenue?")
+- Use summarize_document for overview requests (e.g., "Summarize key findings", "What are the main points?")
+- Pass additional instructions in the 'notes' parameter when summarizing (e.g., notes="Focus on financial metrics")
+
+Response Style Examples:
+- Good: "Accenture +8% USD, Siemens +3% actual. Accenture higher."
+- Bad: "Accenture's Q3 FY2025 revenue growth was 8% in U.S. dollars... (lengthy explanation)"
+"""
+
+
+def build_system_prompt(documents: list = None) -> str:
+    """
+    Build system prompt with dynamically generated document list.
+
+    Args:
+        documents: List of processed documents
+
+    Returns:
+        Complete system prompt string
+    """
+    prompt = f"{BASE_SYSTEM_PROMPT}\n{DOMAIN_INSTRUCTIONS}"
+
+    if documents:
+        # Extract unique document names
+        doc_names = sorted(set(doc.metadata.get('source', 'Unknown') for doc in documents))
+        doc_list = "\n".join(f"- {name}" for name in doc_names)
+        prompt += f"\nAvailable Documents:\n{doc_list}"
+
+    return prompt
 
 
 class MultiDocumentAgent:
@@ -58,7 +87,7 @@ class MultiDocumentAgent:
 
     def __init__(
         self,
-        model_name: str = "openai:gpt-4.1",
+        model_name: str = "openai:gpt-5-2025-08-07",
         pdf_directory: str = "./data/sample_pdfs/"
     ):
         """
@@ -68,33 +97,18 @@ class MultiDocumentAgent:
             model_name: Name of the LLM model to use
             pdf_directory: Path to directory containing PDF files
         """
-        # Initialize LLM
         self.model = init_chat_model(model_name)
-
-        # Process documents
-        print("Processing documents...")
         self.documents = process_documents(pdf_directory)
-
-        # Initialize retriever
-        print("Initializing vector store...")
         self.retriever = VectorStoreRetriever()
         self.retriever.add_documents(self.documents)
-
-        # Set global retriever for tools
         set_retriever(self.retriever)
-
-        # Get tools
         self.tools = get_available_tools()
-
-        # Create agent
-        print("Creating agent...")
+        system_prompt = build_system_prompt(self.documents)
         self.agent = create_agent(
             self.model,
             self.tools,
-            system_prompt=SYSTEM_PROMPT
+            system_prompt=system_prompt
         )
-
-        print("Agent initialized successfully!")
 
     def query(self, question: str, stream: bool = True) -> Dict[str, Any]:
         """
@@ -108,9 +122,6 @@ class MultiDocumentAgent:
             Dictionary containing the agent's response
         """
         if stream:
-            print(f"\n{'='*80}")
-            print(f"Question: {question}")
-            print(f"{'='*80}\n")
 
             for event in self.agent.stream(
                 {"messages": [{"role": "user", "content": question}]},
@@ -124,34 +135,3 @@ class MultiDocumentAgent:
                 {"messages": [{"role": "user", "content": question}]}
             )
             return response
-
-
-def main():
-    """
-    Main function to run the agent interactively.
-    """
-    # Load environment variables
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    # Verify API key is set
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY not found in environment variables")
-
-    # Initialize agent
-    agent = MultiDocumentAgent()
-
-    # Example queries
-    example_queries = [
-        "Compare the revenue growth in Q3 FY2025 from Accenture.pdf and Siemens.pdf. Which company had higher growth?",
-        "What are the operating margin figures for Accenture.pdf, Siemens.pdf, and Infineon.pdf in Q3 FY2025?",
-    ]
-
-    # Run example queries
-    for query in example_queries:
-        agent.query(query, stream=True)
-        print("\n")
-
-
-if __name__ == "__main__":
-    main()

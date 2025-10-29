@@ -3,7 +3,11 @@
 from typing import Tuple, List
 from langchain.tools import tool
 from langchain_core.documents import Document
+from langchain_openai import ChatOpenAI
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.retrieval import VectorStoreRetriever
+from src.document_processor import load_pdfs
+import os
 
 
 # Global retriever instance (will be initialized by agent)
@@ -64,6 +68,103 @@ def retrieve_context(query: str, document_name: str = None) -> Tuple[str, List[D
     return serialized, retrieved_docs
 
 
+@tool
+def summarize_document(document_name: str, notes: str = "") -> str:
+    """
+    Summarize a document using hierarchical summarization.
+
+    This tool loads a document, splits it into chunks, summarizes each chunk,
+    then combines and summarizes the chunk summaries to create a final summary.
+
+    Args:
+        document_name: Name of the document to summarize (e.g., 'Accenture.pdf')
+        notes: Optional notes or instructions for summarization (e.g., 'Focus on financial metrics', 'Extract key findings')
+
+    Returns:
+        Final summary of the document
+    """
+
+    llm = ChatOpenAI(
+        model="gpt-5-mini-2025-08-07",
+        temperature=0,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+
+
+    pdf_directory = "./data/sample_pdfs/"
+    all_docs = load_pdfs(pdf_directory)
+
+    target_docs = [doc for doc in all_docs if document_name in doc.metadata.get('source', '')]
+
+    if not target_docs:
+        return f"Document '{document_name}' not found in {pdf_directory}"
+
+    full_text = "\n\n".join([doc.page_content for doc in target_docs])
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=12000,  # ~3000 tokens
+        chunk_overlap=500,
+        separators=["\n\n\n", "\n\n", "\n", " ", ""]
+    )
+    chunks = text_splitter.split_text(full_text)
+
+    if len(chunks) == 0:
+        return "Document is empty or could not be processed"
+
+    notes_instruction = f"\n\nAdditional instructions: {notes}" if notes else ""
+
+    chunk_summaries = []
+    for i, chunk in enumerate(chunks):
+        prompt = f"""Summarize the following text concisely, preserving key information, facts, and numbers:{notes_instruction}
+
+Text:
+{chunk}
+
+Summary:"""
+
+        response = llm.invoke(prompt)
+        chunk_summaries.append(response.content)
+
+    # Step 3: If we have multiple chunk summaries, combine and summarize again
+    if len(chunk_summaries) == 1:
+        final_summary = chunk_summaries[0]
+    else:
+        # Combine all chunk summaries
+        combined_summaries = "\n\n---\n\n".join(chunk_summaries)
+
+        # If combined summaries are too long, split and summarize again (recursive)
+        if len(combined_summaries) > 48000:  # ~12000 tokens
+            summary_chunks = text_splitter.split_text(combined_summaries)
+            intermediate_summaries = []
+
+            for summary_chunk in summary_chunks:
+                prompt = f"""Combine and summarize the following summaries into a coherent summary:{notes_instruction}
+
+Summaries:
+{summary_chunk}
+
+Combined Summary:"""
+
+                response = llm.invoke(prompt)
+                intermediate_summaries.append(response.content)
+
+            combined_summaries = "\n\n---\n\n".join(intermediate_summaries)
+
+        # Final summarization
+        final_prompt = f"""Create a comprehensive final summary by combining the following summaries.
+Preserve important details, key findings, and numerical data:{notes_instruction}
+
+Summaries:
+{combined_summaries}
+
+Final Summary:"""
+
+        final_response = llm.invoke(final_prompt)
+        final_summary = final_response.content
+
+    return f"Summary of {document_name}:\n\n{final_summary}"
+
+
 def get_available_tools():
     """
     Get list of available tools for the agent.
@@ -71,4 +172,4 @@ def get_available_tools():
     Returns:
         List of tool functions
     """
-    return [retrieve_context]
+    return [retrieve_context, summarize_document]

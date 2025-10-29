@@ -75,5 +75,4 @@ def process_documents(pdf_directory: str = "./data/sample_pdfs/") -> List[Docume
     """
     docs = load_pdfs(pdf_directory)
     chunks = chunk_documents(docs)
-    print(f"Processed {len(docs)} documents into {len(chunks)} chunks")
     return chunks

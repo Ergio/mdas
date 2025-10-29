@@ -1,11 +1,12 @@
 """
 Main entry point for the Multi-Document Analysis System.
-Run with: python main.py
+Run with: streamlit run main.py
 """
 
 import os
 import sys
 from dotenv import load_dotenv
+import streamlit as st
 
 # Add src to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -14,57 +15,125 @@ from src.agent import MultiDocumentAgent
 
 
 def main():
-    """Main function to run the agent system."""
+    """Main function to run the Streamlit chatbot."""
     # Load environment variables
     load_dotenv()
 
+    # Page configuration
+    st.set_page_config(
+        page_title="Multi-Document Analysis System",
+        page_icon="📄"
+    )
+
+    st.title("Multi-Document Analysis System")
+
     # Verify API key is set
     if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
-        print("ERROR: OPENAI_API_KEY not found or not set properly!")
-        print("Please set your OpenAI API key in the .env file")
-        print("\nSteps to fix:")
-        print("1. Open the .env file")
-        print("2. Replace 'your_openai_api_key_here' with your actual OpenAI API key")
-        print("3. Get your API key from: https://platform.openai.com/api-keys")
-        sys.exit(1)
+        st.error("OPENAI_API_KEY not set properly!")
+        st.stop()
 
-    print("="*80)
-    print("Multi-Document Analysis System")
-    print("="*80)
-    print()
+    # Initialize agent (cached to avoid reprocessing on every interaction)
+    @st.cache_resource
+    def initialize_agent():
+        """Initialize the agent with caching."""
+        try:
+            return MultiDocumentAgent()
+        except Exception as e:
+            st.error(f"Failed to initialize: {str(e)}")
+            st.stop()
 
-    try:
-        # Initialize agent
-        agent = MultiDocumentAgent()
+    agent = initialize_agent()
 
-        print("\n" + "="*80)
-        print("Running example queries...")
-        print("="*80)
+    # Initialize chat history - store all messages sequentially
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-        # Example queries
-        example_queries = [
-            "Compare the revenue growth in Q3 FY2025 from Accenture.pdf and Siemens.pdf. Which company had higher growth?",
-            "What are the operating margin figures for Accenture.pdf, Siemens.pdf, and Infineon.pdf in Q3 FY2025?",
-        ]
+    # Display all messages from history
+    for msg in st.session_state.messages:
+        if msg["type"] == "user":
+            with st.chat_message("user"):
+                st.markdown(msg["content"])
+        elif msg["type"] == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(msg["content"])
+        elif msg["type"] == "tool_call":
+            with st.status(f"🔧 Tool: {msg['name']}", state="complete"):
+                st.code(msg["args"], language="json")
+        elif msg["type"] == "tool_response":
+            with st.expander(f"📥 Tool Response: {msg['name']}"):
+                if len(msg["content"]) > 500:
+                    st.text_area("", msg["content"], height=150, disabled=True, key=msg.get("key"))
+                else:
+                    st.code(msg["content"])
 
-        # Run example queries
-        for i, query in enumerate(example_queries, 1):
-            print(f"\n{'='*80}")
-            print(f"Example Query {i}/{len(example_queries)}")
-            print(f"{'='*80}")
-            agent.query(query, stream=True)
+    # Chat input
+    if prompt := st.chat_input("Ask a question..."):
+        # Display and store user message
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.messages.append({"type": "user", "content": prompt})
 
-        print("\n" + "="*80)
-        print("All example queries completed!")
-        print("="*80)
+        # Process with agent
+        try:
+            result = agent.query(prompt, stream=False)
 
-    except Exception as e:
-        print(f"\nERROR: {str(e)}")
-        print("\nPlease check:")
-        print("1. Your .env file is configured correctly")
-        print("2. PDF files exist in ./data/sample_pdfs/")
-        print("3. All dependencies are installed: pip install -r requirements.txt")
-        sys.exit(1)
+            # Parse all messages in order
+            for msg in result["messages"]:
+                # AI message with tool calls
+                if hasattr(msg, 'tool_calls') and msg.tool_calls and len(msg.tool_calls) > 0:
+                    for tool_call in msg.tool_calls:
+                        tool_name = tool_call.get("name", "unknown")
+                        tool_args = str(tool_call.get("args", {}))
+
+                        with st.status(f"🔧 Tool: {tool_name}", state="complete"):
+                            st.code(tool_args, language="json")
+
+                        st.session_state.messages.append({
+                            "type": "tool_call",
+                            "name": tool_name,
+                            "args": tool_args
+                        })
+
+                # Tool response
+                elif hasattr(msg, 'name') and msg.name and hasattr(msg, 'content') and msg.content:
+                    tool_name = msg.name
+                    content = msg.content
+
+                    with st.expander(f"📥 Tool Response: {tool_name}"):
+                        if len(content) > 500:
+                            st.text_area("", content, height=150, disabled=True, key=f"new_{id(msg)}")
+                        else:
+                            st.code(content)
+
+                    st.session_state.messages.append({
+                        "type": "tool_response",
+                        "name": tool_name,
+                        "content": content,
+                        "key": f"hist_{len(st.session_state.messages)}"
+                    })
+
+            # Final AI response
+            final_response = result["messages"][-1].content
+            with st.chat_message("assistant"):
+                st.markdown(final_response)
+            st.session_state.messages.append({"type": "assistant", "content": final_response})
+
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            with st.chat_message("assistant"):
+                st.error(error_msg)
+            st.session_state.messages.append({"type": "assistant", "content": error_msg})
+
+    # Sidebar
+    with st.sidebar:
+        st.header("Documents")
+        st.text("• Accenture.pdf")
+        st.text("• Siemens.pdf")
+        st.text("• Infineon.pdf")
+
+        if st.button("Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
 
 
 if __name__ == "__main__":
